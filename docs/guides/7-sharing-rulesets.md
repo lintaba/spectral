@@ -4,8 +4,8 @@ A [ruleset](../getting-started/3-rulesets.md) becomes infinitely more useful whe
 
 To help you out distribute your rulesets among the others, Spectral provides a few ways to load rulesets from a variety of resources:
 
+- via [NPM](#NPM) - recommended
 - via a HTTP server
-- via [NPM](#NPM)
 - via the filesystem
 
 Or mix and match!
@@ -14,10 +14,109 @@ Or mix and match!
 extends:
   - ./config/spectral.json
   - https://example.org/api/style.yaml
-  - some-npm-module
+  - https://unpkg.com/some-npm-module
 ```
 
 There are various pros and cons to each approach, so see what is right for you.
+
+## NPM (recommended)
+
+As Spectral is a [NPM](https://www.npmjs.com/) package, we support loading rulesets from other NPM packages.
+
+Not only it lets you serve files without a need for hosting your own server or uploading it somewhere else, but also supports versioning out of the box, and makes it easy to bundle a ruleset with custom rulesets.
+
+This is a very basic example showing how the directory structure as well as package.json may look like.
+
+**package.json**
+
+```json
+{
+  "name": "example-spectral-ruleset",
+  "version": "0.0.0",
+  "description": "Example Spectral ruleset",
+  "type": "module",
+  "exports": {
+    "default": "ruleset.mjs"
+  },
+  "scripts": {},
+  "license": "ISC",
+  "dependencies": {
+    "@stoplight/core": "^1.0" // you can avoid this if you use some CDN such as Skypack
+  }
+}
+```
+
+**ruleset.mjs**
+
+```js
+import min from "./functions/min.mjs";
+
+export default {
+  rules: {
+    "valid-foo-value": {
+      given: "$",
+      then: {
+        field: "foo",
+        function: min,
+        functionOptions: {
+          value: 1,
+        },
+      },
+    },
+  },
+};
+```
+
+**functions/min.js**
+
+```js
+import {createRulesetFunction } from '@stoplight/spectral-core'; // or point at some CDN instead
+
+export default createRulesetFunction({
+  errorOnInvalidInput: true,
+  input: {
+    type: 'number',
+    errorMessage: "Value is not a number.", // optional, the default should be good enough
+  },
+  options: {
+    type: 'object',
+    properties: {
+      value: {
+        type: 'number',
+      }
+    },
+    required: ['value'],
+  },
+}, (input, { value }) => {
+  if (input < value) {
+    return [
+      {
+        message: `Value is lower than ${min}`,
+      },
+    ];
+  }
+};
+```
+
+Developers wanting to pull in your ruleset can just reference the module name in `extends`:
+
+```js
+import exampleSpectralRuleset from "https://cdn.skypack.dev/example-spectral-ruleset";
+
+export default {
+  extends: [exampleSpectralRuleset],
+};
+```
+
+Pegging a ruleset on given version is possible:
+
+```js
+import exampleSpectralRuleset from "https://cdn.skypack.dev/example-spectral-ruleset@0.2.0";
+
+export default {
+  extends: [exampleSpectralRuleset],
+};
+```
 
 ## HTTP Server
 
@@ -42,85 +141,6 @@ As with any ruleset, you can pass these directly to the [Spectral CLI](./2-cli.m
 
 ```shell
 spectral lint -r https://example.com/some-ruleset.yml
-```
-
-## NPM
-
-As Spectral is a [NPM](https://www.npmjs.com/) package, we support loading rulesets from other NPM packages.
-
-Not only it lets you serve files without a need for hosting your own server or uploading it somewhere else, but also supports versioning out of the box, and makes it easy to bundle a ruleset with custom rulesets.
-
-This is a very basic example showing how the directory structure as well as package.json may look like.
-
-**package.json**
-
-```json
-{
-  "name": "example-spectral-ruleset",
-  "version": "0.0.0",
-  "description": "Example Spectral ruleset",
-  "main": "ruleset.json",
-  "scripts": {},
-  "license": "ISC"
-}
-```
-
-**ruleset.json**
-
-```json
-{
-  "functions": ["min"],
-  "rules": {
-    "valid-foo-value": {
-      "given": "$",
-      "then": {
-        "field": "foo",
-        "function": "min",
-        "functionOptions": {
-          "value": 1
-        }
-      }
-    }
-  }
-}
-```
-
-**functions/min.js**
-
-```js
-"use strict";
-
-module.exports = function (targetVal, { min }) {
-  if (typeof targetVal !== "number") {
-    return [
-      {
-        message: "Value is not a number.",
-      },
-    ];
-  }
-
-  if (targetVal < min) {
-    return [
-      {
-        message: `Value is lower than ${min}`,
-      },
-    ];
-  }
-};
-```
-
-Developers wanting to pull in your ruleset can just reference the module name in `extends`:
-
-```yaml
-extends:
-  - example-spectral-ruleset
-```
-
-Pegging a ruleset on given version is possible:
-
-```yaml
-extends:
-  - "example-spectral-ruleset@0.2.0"
 ```
 
 ## Filesystem
